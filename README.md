@@ -123,7 +123,7 @@ Playbook поддерживает теги для выборочного вып�
 
 ## Результаты выполнения   
 
-![alt text](<Screenshot from 2026-04-06 07-53-36.png>)
+[![alt text](<Screenshot from 2026-04-06 07-53-36.png>)](https://github.com/Relekt71/ansible_2hw/blob/main/screenshots/Screenshot%20from%202026-04-06%2007-53-36.png?raw=true)
 
 Задание 4: Проверка ansible-lint
 
