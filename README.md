@@ -123,24 +123,25 @@ Playbook поддерживает теги для выборочного вып�
 
 ## Результаты выполнения   
 
-[![alt text](<Screenshot from 2026-04-06 07-53-36.png>)](https://github.com/Relekt71/ansible_2hw/blob/main/screenshots/Screenshot%20from%202026-04-06%2007-53-36.png?raw=true)
+<img width="902" height="56" alt="image" src="https://github.com/user-attachments/assets/6020070d-a5a3-4016-b710-fad697a062c1" />
 
 Задание 4: Проверка ansible-lint
 
-![alt text](<Screenshot from 2026-04-06 07-54-05.png>)
+<img width="975" height="74" alt="image" src="https://github.com/user-attachments/assets/14655d14-d93c-4303-915b-56f7d180e978" />
 
 Задание 5: Запуск с флагом --check
 
-![alt text](<Screenshot from 2026-04-06 11-33-32.png>)
+<img width="937" height="327" alt="image" src="https://github.com/user-attachments/assets/b8e6d884-38ba-49f9-89b7-7006cb02de8c" />
 
 Задание 6: Первый запуск с флагом --diff
 
-![alt text](<Screenshot from 2026-04-06 11-34-15.png>)
+<img width="946" height="330" alt="image" src="https://github.com/user-attachments/assets/e6892684-8485-4ffe-a92d-216cf35e227f" />
 
 Задание 7: Повторный запуск с флагом --diff (идемпотентность)
 
-![alt text](<Screenshot from 2026-04-06 11-34-15-1.png>)
+<img width="946" height="330" alt="image" src="https://github.com/user-attachments/assets/c711196d-41ca-4a6e-9617-4397bf4d5a47" />
 
 Задание 8: Запуск с тегами
 
-![alt text](<Screenshot from 2026-04-06 11-50-12.png>)
+<img width="946" height="330" alt="image" src="https://github.com/user-attachments/assets/dc22a07f-512f-42f5-a095-0d2a8a944dd7" />
+
