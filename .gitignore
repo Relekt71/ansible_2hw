@@ -1,0 +1,28 @@
+# Ansible
+*.retry
+*.tmp
+*.bak
+*.swp
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+*.key
+*.pem
+*.secret
+
+# Temporary files
+/tmp/
+/venv/

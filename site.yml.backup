@@ -1,0 +1,252 @@
+---
+# Play 1: Install Clickhouse
+- name: Install Clickhouse
+  hosts: clickhouse
+  become: true
+  vars_files:
+    - group_vars/clickhouse/vars.yml
+
+  handlers:
+    - name: Start clickhouse service
+      become: true
+      ansible.builtin.service:
+        name: clickhouse-server
+        state: restarted
+        enabled: true
+
+  tasks:
+    - name: Install dependencies for CentOS
+      ansible.builtin.yum:
+        name:
+          - curl
+          - tar
+          - which
+          - wget
+        state: present
+
+    - name: Download clickhouse common static package
+      ansible.builtin.get_url:
+        url: "https://packages.clickhouse.com/rpm/stable/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm"
+        dest: "/tmp/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm"
+        mode: '0644'
+
+    - name: Download clickhouse client package
+      ansible.builtin.get_url:
+        url: "https://packages.clickhouse.com/rpm/stable/clickhouse-client-{{ clickhouse_version }}.x86_64.rpm"
+        dest: "/tmp/clickhouse-client-{{ clickhouse_version }}.x86_64.rpm"
+        mode: '0644'
+
+    - name: Download clickhouse server package
+      ansible.builtin.get_url:
+        url: "https://packages.clickhouse.com/rpm/stable/clickhouse-server-{{ clickhouse_version }}.x86_64.rpm"
+        dest: "/tmp/clickhouse-server-{{ clickhouse_version }}.x86_64.rpm"
+        mode: '0644'
+
+    - name: Install clickhouse packages using yum
+      ansible.builtin.yum:
+        name:
+          - "/tmp/clickhouse-common-static-{{ clickhouse_version }}.x86_64.rpm"
+          - "/tmp/clickhouse-client-{{ clickhouse_version }}.x86_64.rpm"
+          - "/tmp/clickhouse-server-{{ clickhouse_version }}.x86_64.rpm"
+        state: present
+        disable_gpg_check: true
+      notify: Start clickhouse service
+
+    - name: Flush handlers
+      ansible.builtin.meta: flush_handlers
+
+    - name: Wait for clickhouse to start
+      ansible.builtin.wait_for:
+        port: 8123
+        host: localhost
+        timeout: 30
+
+    - name: Create database
+      ansible.builtin.command: "clickhouse-client -q 'create database if not exists logs;'"
+      register: create_db
+      changed_when: create_db.rc == 0 and "'already exists' not in create_db.stderr"
+      failed_when: false
+
+    - name: Cleanup RPM files
+      ansible.builtin.file:
+        path: "/tmp/{{ item }}-{{ clickhouse_version }}.x86_64.rpm"
+        state: absent
+      loop:
+        - clickhouse-common-static
+        - clickhouse-client
+        - clickhouse-server
+      failed_when: false
+      changed_when: false
+
+# Play 2: Install and configure Vector
+- name: Install and configure Vector
+  hosts: vector
+  become: true
+  vars:
+    vector_version: "0.21.1"
+    vector_arch: "x86_64"
+    vector_install_dir: "/opt/vector"
+    vector_config_dir: "/etc/vector"
+    vector_data_dir: "/var/lib/vector"
+
+  handlers:
+    - name: Restart vector service
+      ansible.builtin.systemd:
+        name: vector
+        state: restarted
+        daemon_reload: true
+      listen: "restart vector"
+      when: ansible_service_mgr == "systemd"
+
+  tasks:
+    - name: Install dependencies for Vector
+      ansible.builtin.apt:
+        name:
+          - tar
+          - gzip
+          - wget
+          - procps
+        state: present
+        update_cache: true
+      tags: [vector, dependencies]
+
+    - name: Create vector system user
+      ansible.builtin.user:
+        name: vector
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+        home: "{{ vector_data_dir }}"
+      tags: [vector, user]
+
+    - name: Create vector directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: vector
+        group: vector
+        mode: '0755'
+      loop:
+        - "{{ vector_install_dir }}"
+        - "{{ vector_config_dir }}"
+        - "{{ vector_data_dir }}"
+      tags: [vector, directories]
+
+    - name: Check if vector already installed
+      ansible.builtin.stat:
+        path: "{{ vector_install_dir }}/vector"
+      register: vector_installed
+      tags: [vector, check]
+
+    - name: Download vector archive
+      ansible.builtin.get_url:
+        url: "https://packages.timber.io/vector/{{ vector_version }}/vector-{{ vector_version }}-{{ vector_arch }}-unknown-linux-gnu.tar.gz"
+        dest: "/tmp/vector-{{ vector_version }}.tar.gz"
+        mode: '0644'
+        timeout: 120
+      when: not vector_installed.stat.exists
+      tags: [vector, download]
+
+    - name: Extract vector archive
+      ansible.builtin.unarchive:
+        src: "/tmp/vector-{{ vector_version }}.tar.gz"
+        dest: "/tmp/"
+        remote_src: true
+        creates: "/tmp/vector-{{ vector_arch }}-unknown-linux-gnu/bin/vector"
+      when: not vector_installed.stat.exists
+      tags: [vector, extract]
+
+    - name: Install vector binary
+      ansible.builtin.copy:
+        src: "/tmp/vector-{{ vector_arch }}-unknown-linux-gnu/bin/vector"
+        dest: "{{ vector_install_dir }}/vector"
+        owner: vector
+        group: vector
+        mode: '0755'
+        remote_src: true
+      when: not vector_installed.stat.exists
+      notify: Restart vector service
+      tags: [vector, install]
+
+    - name: Create symlink for vector
+      ansible.builtin.file:
+        src: "{{ vector_install_dir }}/vector"
+        dest: "/usr/local/bin/vector"
+        state: link
+      notify: Restart vector service
+      tags: [vector, symlink]
+
+    - name: Deploy vector configuration
+      ansible.builtin.template:
+        src: vector.toml.j2
+        dest: "{{ vector_config_dir }}/vector.toml"
+        owner: vector
+        group: vector
+        mode: '0644'
+      notify: Restart vector service
+      tags: [vector, config]
+
+    - name: Deploy vector systemd service
+      ansible.builtin.template:
+        src: vector.service.j2
+        dest: /etc/systemd/system/vector.service
+        owner: root
+        group: root
+        mode: '0644'
+      when: ansible_service_mgr == "systemd"
+      notify: Restart vector service
+      tags: [vector, service]
+
+    - name: Clean up temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/vector-{{ vector_version }}.tar.gz"
+        - "/tmp/vector-{{ vector_arch }}-unknown-linux-gnu"
+      when: not vector_installed.stat.exists
+      tags: [vector, cleanup]
+
+    - name: Start vector service for systemd systems
+      ansible.builtin.systemd:
+        name: vector
+        state: started
+        enabled: true
+        daemon_reload: true
+      when: ansible_service_mgr == "systemd"
+      tags: [vector, service]
+
+    - name: Create vector start script for Docker
+      ansible.builtin.copy:
+        dest: /etc/vector-start.sh
+        mode: '0755'
+        content: |
+          #!/bin/bash
+          /usr/local/bin/vector --config {{ vector_config_dir }}/vector.toml >> /var/log/vector.log 2>&1
+      when: ansible_service_mgr != "systemd"
+      tags: [vector, service]
+
+    - name: Start vector manually for Docker containers
+      ansible.builtin.shell: |
+        pkill vector || true
+        /etc/vector-start.sh &
+      when: ansible_service_mgr != "systemd"
+      changed_when: false
+      tags: [vector, service]
+
+    - name: Verify vector is running
+      ansible.builtin.command: pgrep vector
+      register: vector_status
+      changed_when: false
+      failed_when: false
+      tags: [vector, service]
+
+    - name: Show vector status
+      ansible.builtin.debug:
+        msg: |
+          Vector installation completed!
+          Binary: {{ vector_install_dir }}/vector
+          Config: {{ vector_config_dir }}/vector.toml
+          Status: {{ 'running' if vector_status.rc == 0 else 'not running (run manually: /etc/vector-start.sh)' }}
+      tags: [vector, service]
+

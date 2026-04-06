@@ -1,0 +1,17 @@
+[Unit]
+Description=Vector Observability Pipeline
+Documentation=https://vector.dev
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=vector
+Group=vector
+ExecStart={{ vector_install_dir }}/vector --config {{ vector_config_dir }}/vector.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

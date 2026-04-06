@@ -1,0 +1,17 @@
+# Vector configuration file
+# Managed by Ansible
+
+data_dir = "{{ vector_data_dir }}"
+
+[sources.demo_logs]
+type = "demo_logs"
+format = "json"
+interval = 1
+
+[sinks.console]
+type = "console"
+inputs = ["demo_logs"]
+target = "stdout"
+
+[sinks.console.encoding]
+codec = "json"
